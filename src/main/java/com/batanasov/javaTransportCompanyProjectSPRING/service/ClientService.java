@@ -37,6 +37,10 @@ public class ClientService {
      */
     @Transactional
     public Client createClient(Client client) {
+        Optional<Client> clientOptional = clientRepository.findById(client.getClientId());
+        if(clientOptional.isPresent()) {
+            throw new EntityNotFoundException("Client with id: " + client.getClientId() + " already exists.");
+        }
         logger.info("Creating client: {}", client);
         return clientRepository.save(client);
     }
