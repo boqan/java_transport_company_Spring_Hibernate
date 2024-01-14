@@ -5,6 +5,7 @@ import com.batanasov.javaTransportCompanyProjectSPRING.entity.Employee;
 import com.batanasov.javaTransportCompanyProjectSPRING.entity.TransportContract;
 import com.batanasov.javaTransportCompanyProjectSPRING.entity.Vehicle;
 import com.batanasov.javaTransportCompanyProjectSPRING.exceptions.EmployeeNotQualifiedForVehicleException;
+import com.batanasov.javaTransportCompanyProjectSPRING.exceptions.EntityAlreadyExistsException;
 import com.batanasov.javaTransportCompanyProjectSPRING.exceptions.EntityNotFoundException;
 import jakarta.validation.constraints.NotNull;
 import org.slf4j.Logger;
@@ -79,16 +80,26 @@ public class TransportContractService {
      * @param transportContract the transport contract to be created.
      * @return the saved transport contract entity.
      * @throws EmployeeNotQualifiedForVehicleException if the employee is not qualified for the vehicle in the contract.
+     * @throws EntityNotFoundException if a transport contract with the same ID already exists.
      */
     @Transactional
-    public TransportContract createTransportContract(@NotNull TransportContract transportContract) throws EmployeeNotQualifiedForVehicleException {
-        logger.info("Creating transport contract: {}", transportContract);
+    public TransportContract createTransportContract(@NotNull TransportContract transportContract)
+            throws EmployeeNotQualifiedForVehicleException, EntityNotFoundException {
 
         if (!isQualifiedForVehicle(transportContract.getEmployee(), transportContract.getVehicle())) {
             throw new EmployeeNotQualifiedForVehicleException("Employee does not have the required qualification for this vehicle type.");
         }
 
-        return transportContractRepository.save(transportContract);
+        TransportContract savedContract = transportContractRepository.save(transportContract);
+
+        Optional<TransportContract> transportContractOptional = transportContractRepository.findById(savedContract.getContractId());
+        if(transportContractOptional.isPresent() && !transportContractOptional.get().equals(savedContract)) {
+            transportContractRepository.delete(savedContract);
+            throw new EntityAlreadyExistsException("TransportContract with id: " + savedContract.getContractId() + " already exists.");
+        }
+
+        logger.info("Created transport contract: {}", savedContract);
+        return savedContract;
     }
 
     /**
@@ -101,7 +112,7 @@ public class TransportContractService {
      * @throws EntityNotFoundException if the transport contract with the given ID is not found.
      */
     @Transactional
-    public TransportContract updateTransportContract(@NotNull Long id, @NotNull TransportContract updatedContract) throws EmployeeNotQualifiedForVehicleException {
+    public TransportContract updateTransportContract(@NotNull Long id, @NotNull TransportContract updatedContract) throws EmployeeNotQualifiedForVehicleException, EntityNotFoundException {
         if (!isQualifiedForVehicle(updatedContract.getEmployee(), updatedContract.getVehicle())) {
             throw new EmployeeNotQualifiedForVehicleException("Employee does not have the required qualification for this vehicle type.");
         }
@@ -133,7 +144,7 @@ public class TransportContractService {
      * @throws EntityNotFoundException if the transport contract with the given ID is not found.
      */
     @Transactional
-    public void deleteTransportContract(@NotNull Long id) {
+    public void deleteTransportContract(@NotNull Long id) throws EntityNotFoundException {
         TransportContract contract = transportContractRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("TransportContract not found with id: " + id));
 
@@ -255,44 +266,5 @@ public class TransportContractService {
 
         return contracts;
     }
-
-    // Potential fix to the last fields of the Transport Contract not showing up
-
-//    public List<TransportContract> importTransportContractsFromCSV(String filename) {
-//        List<TransportContract> contracts = new ArrayList<>();
-//        DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-//
-//        try (BufferedReader reader = new BufferedReader(new FileReader(filename))) {
-//            String line;
-//            reader.readLine(); // Skip header line
-//            while ((line = reader.readLine()) != null) {
-//                try {
-//                    String[] parts = line.split(",");
-//                    TransportContract contract = new TransportContract();
-//                    contract.setContractId(Long.parseLong(parts[0]));
-//                    contract.setDestination(parts[1]);
-//                    contract.setStartDate(!parts[2].equals("N/A") ? LocalDate.parse(parts[2], dateFormat) : null);
-//                    contract.setPrice(Double.parseDouble(parts[3]));
-//                    contract.setCargoDetails(parts[4]);
-//                    contract.setStatus(Boolean.parseBoolean(parts[5]));
-//                    contract.setWeight(Double.parseDouble(parts[6]));
-//
-//                    // Rebuild relationships
-//                    contract.setCompany(getTransportContract(Long.parseLong(parts[7])));
-//                    contract.setClient(clientService.findById(Long.parseLong(parts[8])));
-//                    contract.setVehicle(vehicleService.findById(Long.parseLong(parts[9])));
-//                    contract.setEmployee(employeeService.findById(Long.parseLong(parts[10])));
-//
-//                    contracts.add(contract);
-//                } catch (DateTimeParseException | NumberFormatException e) {
-//                    System.err.println("Error parsing line: " + line + " - " + e.getMessage());
-//                }
-//            }
-//        } catch (IOException e) {
-//            System.err.println("Error reading from CSV file: " + e.getMessage());
-//        }
-//
-//        return contracts;
-//    }
 
 }

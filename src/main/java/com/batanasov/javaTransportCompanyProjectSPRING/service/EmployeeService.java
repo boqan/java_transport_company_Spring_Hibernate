@@ -3,6 +3,7 @@ package com.batanasov.javaTransportCompanyProjectSPRING.service;
 import com.batanasov.javaTransportCompanyProjectSPRING.DTO.EmployeeContractCountDTO;
 import com.batanasov.javaTransportCompanyProjectSPRING.DTO.EmployeeRevenueDTO;
 import com.batanasov.javaTransportCompanyProjectSPRING.entity.Employee;
+import com.batanasov.javaTransportCompanyProjectSPRING.exceptions.EntityAlreadyExistsException;
 import com.batanasov.javaTransportCompanyProjectSPRING.exceptions.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,11 +37,20 @@ public class EmployeeService {
      *
      * @param employee the employee to be created.
      * @return the saved employee entity.
+     * @throws EntityNotFoundException if an employee with the same ID already exists.
      */
     @Transactional
-    public Employee createEmployee(Employee employee) {
-        logger.info("Creating employee: {}", employee);
-        return employeeRepository.save(employee);
+    public Employee createEmployee(Employee employee) throws EntityNotFoundException {
+        Employee savedEmployee = employeeRepository.save(employee);
+
+        Optional<Employee> employeeOptional = employeeRepository.findById(savedEmployee.getEmployeeId());
+        if(employeeOptional.isPresent() && !employeeOptional.get().equals(savedEmployee)) {
+            employeeRepository.delete(savedEmployee);
+            throw new EntityAlreadyExistsException("Employee with id: " + savedEmployee.getEmployeeId() + " already exists.");
+        }
+
+        logger.info("Created employee: {}", savedEmployee);
+        return savedEmployee;
     }
 
     /**
@@ -52,7 +62,7 @@ public class EmployeeService {
      * @throws EntityNotFoundException if the employee with the given ID is not found.
      */
     @Transactional
-    public Employee updateEmployee(Long id, Employee updatedEmployee) {
+    public Employee updateEmployee(Long id, Employee updatedEmployee) throws EntityNotFoundException {
         return employeeRepository.findById(id)
                 .map(employee -> {
                     employee.setName(updatedEmployee.getName());
@@ -74,7 +84,7 @@ public class EmployeeService {
      * @throws EntityNotFoundException if the employee with the given ID is not found.
      */
     @Transactional
-    public void deleteEmployee(Long id) {
+    public void deleteEmployee(Long id) throws EntityNotFoundException {
         Employee employee = employeeRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Employee not found with id: " + id));
 

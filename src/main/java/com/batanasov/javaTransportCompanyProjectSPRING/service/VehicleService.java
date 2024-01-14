@@ -1,6 +1,7 @@
 package com.batanasov.javaTransportCompanyProjectSPRING.service;
 
 import com.batanasov.javaTransportCompanyProjectSPRING.entity.Vehicle;
+import com.batanasov.javaTransportCompanyProjectSPRING.exceptions.EntityAlreadyExistsException;
 import com.batanasov.javaTransportCompanyProjectSPRING.exceptions.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,15 +30,24 @@ public class VehicleService {
     }
 
     /**
-     * Creates a new vehicle and saves it to the database.
+     * Creates a new vehicle in the database.
      *
      * @param vehicle the vehicle to be created.
      * @return the saved vehicle entity.
+     * @throws EntityAlreadyExistsException if a vehicle with the same ID already exists.
      */
     @Transactional
-    public Vehicle createVehicle(Vehicle vehicle) {
-        logger.info("Creating vehicle: {}", vehicle);
-        return vehicleRepository.save(vehicle);
+    public Vehicle createVehicle(Vehicle vehicle) throws EntityNotFoundException {
+        Vehicle savedVehicle = vehicleRepository.save(vehicle);
+
+        Optional<Vehicle> vehicleOptional = vehicleRepository.findById(savedVehicle.getVehicleId());
+        if(vehicleOptional.isPresent() && !vehicleOptional.get().equals(savedVehicle)) {
+            vehicleRepository.delete(savedVehicle);
+            throw new EntityAlreadyExistsException("Vehicle with id: " + savedVehicle.getVehicleId() + " already exists.");
+        }
+
+        logger.info("Created vehicle: {}", savedVehicle);
+        return savedVehicle;
     }
 
     /**
@@ -49,7 +59,7 @@ public class VehicleService {
      * @throws EntityNotFoundException if the vehicle with the specified ID does not exist.
      */
     @Transactional
-    public Vehicle updateVehicle(Long id, Vehicle updatedVehicle) {
+    public Vehicle updateVehicle(Long id, Vehicle updatedVehicle) throws EntityNotFoundException {
         return vehicleRepository.findById(id)
                 .map(vehicle -> {
                     vehicle.setType(updatedVehicle.getType());
@@ -69,7 +79,7 @@ public class VehicleService {
      * @throws EntityNotFoundException if the vehicle with the specified ID does not exist.
      */
     @Transactional
-    public void deleteVehicle(Long id) {
+    public void deleteVehicle(Long id) throws EntityNotFoundException {
         Vehicle vehicle = vehicleRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Vehicle not found with id: " + id));
 

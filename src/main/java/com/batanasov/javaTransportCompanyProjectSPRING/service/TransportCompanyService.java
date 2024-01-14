@@ -1,6 +1,7 @@
 package com.batanasov.javaTransportCompanyProjectSPRING.service;
 
 import com.batanasov.javaTransportCompanyProjectSPRING.entity.TransportCompany;
+import com.batanasov.javaTransportCompanyProjectSPRING.exceptions.EntityAlreadyExistsException;
 import com.batanasov.javaTransportCompanyProjectSPRING.repository.TransportCompanyRepository;
 import com.batanasov.javaTransportCompanyProjectSPRING.exceptions.EntityNotFoundException;
 import jakarta.validation.constraints.NotNull;
@@ -33,11 +34,21 @@ public class TransportCompanyService {
      *
      * @param transportCompany the transport company to be created.
      * @return the saved transport company entity.
+     * @throws EntityNotFoundException if a transport company with the same ID already exists.
      */
     @Transactional
-    public TransportCompany createTransportCompany(@NotNull TransportCompany transportCompany) {
+    public TransportCompany createTransportCompany(@NotNull TransportCompany transportCompany) throws EntityNotFoundException{
         logger.info("Creating transport company: {}", transportCompany);
-        return transportCompanyRepository.save(transportCompany);
+        TransportCompany savedCompany = transportCompanyRepository.save(transportCompany);
+
+        Optional<TransportCompany> transportCompanyOptional = transportCompanyRepository.findById(savedCompany.getCompanyId());
+        if(transportCompanyOptional.isPresent() && !transportCompanyOptional.get().equals(savedCompany)) {
+            logger.error("TransportCompany with id: " + savedCompany.getCompanyId() + " already existed.");
+            transportCompanyRepository.delete(savedCompany);
+            throw new EntityAlreadyExistsException("TransportCompany with id: " + savedCompany.getCompanyId() + " already existed.");
+        }
+
+        return savedCompany;
     }
 
     /**
@@ -49,7 +60,7 @@ public class TransportCompanyService {
      * @throws EntityNotFoundException if the transport company with the given ID is not found.
      */
     @Transactional
-    public TransportCompany updateTransportCompany(@NotNull Long id, @NotNull TransportCompany updatedCompany) {
+    public TransportCompany updateTransportCompany(@NotNull Long id, @NotNull TransportCompany updatedCompany) throws EntityNotFoundException {
         return transportCompanyRepository.findById(id)
                 .map(company -> {
                     company.setName(updatedCompany.getName());
@@ -69,7 +80,7 @@ public class TransportCompanyService {
      * @throws EntityNotFoundException if the transport company with the given ID is not found.
      */
     @Transactional
-    public void deleteTransportCompany(@NotNull Long id) {
+    public void deleteTransportCompany(@NotNull Long id) throws EntityNotFoundException {
         TransportCompany company = transportCompanyRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("TransportCompany not found with id: " + id));
 

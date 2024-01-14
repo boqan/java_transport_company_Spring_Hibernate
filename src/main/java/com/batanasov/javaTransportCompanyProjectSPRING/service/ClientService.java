@@ -1,6 +1,7 @@
 package com.batanasov.javaTransportCompanyProjectSPRING.service;
 
 import com.batanasov.javaTransportCompanyProjectSPRING.entity.Client;
+import com.batanasov.javaTransportCompanyProjectSPRING.exceptions.EntityAlreadyExistsException;
 import com.batanasov.javaTransportCompanyProjectSPRING.exceptions.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,17 +33,22 @@ public class ClientService {
     /**
      * Creates a new client in the system.
      *
-     * @param client The client object to be created.
-     * @return The saved client object with generated ID.
+     * @param client The client to be created.
+     * @return The saved client object.
+     * @throws EntityNotFoundException if a client with the same ID already exists.
      */
     @Transactional
-    public Client createClient(Client client) {
-        Optional<Client> clientOptional = clientRepository.findById(client.getClientId());
-        if(clientOptional.isPresent()) {
-            throw new EntityNotFoundException("Client with id: " + client.getClientId() + " already exists.");
+    public Client createClient(Client client) throws EntityNotFoundException {
+        Client savedClient = clientRepository.save(client);
+
+        Optional<Client> clientOptional = clientRepository.findById(savedClient.getClientId());
+        if(clientOptional.isPresent() && !clientOptional.get().equals(savedClient)) {
+            clientRepository.delete(savedClient);
+            throw new EntityAlreadyExistsException("Client with id: " + savedClient.getClientId() + " already exists.");
         }
-        logger.info("Creating client: {}", client);
-        return clientRepository.save(client);
+
+        logger.info("Created client: {}", savedClient);
+        return savedClient;
     }
 
     /**
@@ -54,7 +60,7 @@ public class ClientService {
      * @throws EntityNotFoundException if the client with the specified ID does not exist.
      */
     @Transactional
-    public Client updateClient(Long id, Client updatedClient) {
+    public Client updateClient(Long id, Client updatedClient) throws EntityNotFoundException {
         return clientRepository.findById(id)
                 .map(client -> {
                     client.setName(updatedClient.getName());
@@ -75,7 +81,7 @@ public class ClientService {
      * @throws EntityNotFoundException if the client with the specified ID does not exist.
      */
     @Transactional
-    public void updatePaymentStatus(Long clientId, boolean needsToPay) {
+    public void updatePaymentStatus(Long clientId, boolean needsToPay) throws EntityNotFoundException {
         Client client = clientRepository.findById(clientId)
                 .orElseThrow(() -> new EntityNotFoundException("Client not found with id: " + clientId));
         client.setNeedsToPay(needsToPay);
@@ -90,7 +96,7 @@ public class ClientService {
      * @throws EntityNotFoundException if the client with the specified ID does not exist.
      */
     @Transactional
-    public void deleteClient(Long id) {
+    public void deleteClient(Long id) throws EntityNotFoundException {
         Client client = clientRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Client not found with id: " + id));
 
